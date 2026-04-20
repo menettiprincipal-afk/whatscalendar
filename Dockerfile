@@ -18,4 +18,4 @@ USER pptruser
 
 # Expõe e Inicia
 EXPOSE 3001
-CMD ["node", "--max-old-space-size=150", "src/app.js"]
+CMD ["node", "--max-old-space-size=150", "server.js"]
