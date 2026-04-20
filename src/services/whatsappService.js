@@ -1,68 +1,114 @@
-const { default: makeWASocket, DisconnectReason, useMultiFileAuthState, fetchLatestBaileysVersion, Browsers } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, DisconnectReason, initAuthCreds, BufferJSON, proto, fetchLatestBaileysVersion, Browsers } = require('@whiskeysockets/baileys');
 const mongoose = require('mongoose');
 const pino = require('pino');
 const qrcode = require('qrcode-terminal');
-const fs = require('fs');
-const path = require('path');
 
-const AuthDocSchema = new mongoose.Schema({
-    id: { type: String, unique: true },
-    files: { type: Map, of: String }
-});
-const BaileysAuth = mongoose.models.BaileysAuth || mongoose.model('BaileysAuth', AuthDocSchema);
+// 1. Schema do MongoDB para salvar os estados do WhatsApp
+const AuthStateSchema = new mongoose.Schema({
+    _id: String,
+    data: mongoose.Schema.Types.Mixed
+}, { _id: false });
+const AuthStateModel = mongoose.models.AuthState || mongoose.model('AuthState', AuthStateSchema);
+
+// 2. Adaptador Oficial para MongoDB
+async function useMongoDBAuthState(sessionId) {
+    const writeData = async (data, id) => {
+        try {
+            const documentId = `${sessionId}-${id}`;
+            const parsedData = JSON.parse(JSON.stringify(data, BufferJSON.replacer));
+            await AuthStateModel.replaceOne({ _id: documentId }, { _id: documentId, data: parsedData }, { upsert: true });
+        } catch (error) {
+            console.error('Error writing auth state to DB:', error);
+        }
+    };
+
+    const readData = async (id) => {
+        try {
+            const documentId = `${sessionId}-${id}`;
+            const doc = await AuthStateModel.findOne({ _id: documentId });
+            if (doc) {
+                return JSON.parse(JSON.stringify(doc.data), BufferJSON.reviver);
+            }
+        } catch (error) {
+            console.error('Error reading auth state from DB:', error);
+        }
+        return null;
+    };
+
+    const removeData = async (id) => {
+        try {
+            await AuthStateModel.deleteOne({ _id: `${sessionId}-${id}` });
+        } catch (error) {
+            console.error('Error removing auth state from DB:', error);
+        }
+    };
+
+    let creds = await readData('creds');
+    if (!creds) {
+        creds = initAuthCreds();
+        await writeData(creds, 'creds');
+    }
+
+    return {
+        state: {
+            creds,
+            keys: {
+                get: async (type, ids) => {
+                    const data = {};
+                    await Promise.all(
+                        ids.map(async (id) => {
+                            let value = await readData(`${type}-${id}`);
+                            if (type === 'app-state-sync-key' && value) {
+                                value = proto.Message.AppStateSyncKeyData.fromObject(value);
+                            }
+                            data[id] = value;
+                        })
+                    );
+                    return data;
+                },
+                set: async (data) => {
+                    const tasks = [];
+                    for (const category in data) {
+                        for (const id in data[category]) {
+                            const value = data[category][id];
+                            const key = `${category}-${id}`;
+                            if (value) {
+                                tasks.push(writeData(value, key));
+                            } else {
+                                tasks.push(removeData(key));
+                            }
+                        }
+                    }
+                    await Promise.all(tasks);
+                }
+            }
+        },
+        saveCreds: () => {
+            return writeData(creds, 'creds');
+        }
+    };
+}
 
 let clientSocket = null;
 let isReady = false;
 
-// 🧠 NOSSA MÁGICA FINAL: Clonamos o diretório nativo para a nuvem
-const sessionDir = path.join(process.cwd(), 'baileys_auth');
-
-async function downloadSession() {
-    try {
-        const doc = await BaileysAuth.findOne({ id: 'meu-bot-v2' });
-        if (doc && doc.files && doc.files.size > 0) {
-            if (!fs.existsSync(sessionDir)) fs.mkdirSync(sessionDir, { recursive: true });
-            for (let [filename, content] of doc.files.entries()) {
-                fs.writeFileSync(path.join(sessionDir, filename), content, 'base64');
-            }
-        }
-    } catch (e) {
-        console.error('Falha ao baixar sessão:', e);
-    }
-}
-
-async function uploadSession() {
-    try {
-        if (!fs.existsSync(sessionDir)) return;
-        const files = fs.readdirSync(sessionDir);
-        const filesMap = {};
-        for (let file of files) {
-            filesMap[file] = fs.readFileSync(path.join(sessionDir, file)).toString('base64');
-        }
-        await BaileysAuth.updateOne({ id: 'meu-bot-v2' }, { $set: { files: filesMap } }, { upsert: true });
-    } catch (e) {}
-}
-
 const initWhatsApp = async () => {
-    console.log('🟡 Preparando instância do Baileys...');
+    console.log('🟡 Preparando instância do Baileys e adaptando para o MongoDB...');
     
-    // Baixamos arquivos antigos da nuvem (se tiver)
-    await downloadSession();
-
-    // Passamos pro Baileys oficial ler como ele entende melhor (Nativamente)
-    const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
+    // Passamos o adaptador para o Baileys ler direto do MongoDB, NUNCA do disco
+    const { state, saveCreds } = await useMongoDBAuthState('meu-bot-v2');
     
-    // 🔥 BUSCA A ÚLTIMA VERSÃO OFICIAL DO WHATSAPP ANTES DE CONECTAR
+    // 🔥 Busca a última versão oficial do WhatsApp Web
     const { version, isLatest } = await fetchLatestBaileysVersion();
     console.log(`📡 Disfarçando servidor com WA Web Oficial v${version.join('.')} (isLatest: ${isLatest})`);
 
     const connectToWhatsApp = () => {
         const sock = makeWASocket({
-            version, // O WhatsApp vai aceitar a conexão imediatamente por não ser versão defasada
+            version, 
             auth: state,
             printQRInTerminal: false,
-            logger: pino({ level: 'silent' }), // Deixado silencioso
-            browser: Browsers.macOS('Desktop') // Usa o agente de navegador OFICIAL DO PRÓPRIO BAILEYS!
+            logger: pino({ level: 'silent' }), 
+            browser: Browsers.macOS('Desktop')
         });
 
         sock.ev.on('connection.update', async (update) => {
@@ -70,7 +116,7 @@ const initWhatsApp = async () => {
             
             if (qr) {
                 console.log('🔴 NOVO QR CODE GERADO. FAÇA A LEITURA PARA CONECTAR:');
-                console.log('🔗 OU COPIE O CÓDIGO BRUTO ABAIXO (site recomendado: br.qr-code-generator.com ou use o VSCode):');
+                console.log('🔗 OU COPIE O CÓDIGO BRUTO ABAIXO (site recomendado: br.qr-code-generator.com):');
                 console.log('\n=============================================');
                 console.log(qr);
                 console.log('=============================================\n');
@@ -83,25 +129,22 @@ const initWhatsApp = async () => {
                 isReady = false;
                 
                 if (!isLogout) {
-                    console.log('🔄 Tentando reconectar silenciosamente. Motivo profundo:', lastDisconnect.error?.message, lastDisconnect.error);
+                    console.log('🔄 Tentando reconectar silenciosamente. Motivo profundo:', lastDisconnect.error?.message);
                     setTimeout(connectToWhatsApp, 5000);
                 } else {
-                    console.log('❌ O BOT FOI DESCONECTADO PELO CELULAR (LogOut)! Ele vai apagar a gaveta da nuvem...');
-                    await BaileysAuth.deleteOne({ id: 'meu-bot-v2' });
-                    try { fs.rmSync(sessionDir, { recursive: true, force: true }); } catch(e){}
+                    console.log('❌ O BOT FOI DESCONECTADO PELO CELULAR (LogOut)!');
+                    // Apagando apenas a pasta antiga que sobrou para fins de limpeza
+                    await AuthStateModel.deleteMany({ _id: { $regex: '^meu-bot-v2-' } });
                 }
             } else if (connection === 'open') {
                 console.log('🟢 WhatsApp LEVE E SUPREMO ESTÁ PRONTO E CONECTADO!');
                 isReady = true;
                 clientSocket = sock;
-                await uploadSession();
             }
         });
 
-        // Ao renovar seguranças, ele salva na pasta e clonamos pro MongoDB cimentar
         sock.ev.on('creds.update', async () => {
              await saveCreds();
-             await uploadSession();
         });
     };
 
