@@ -6,6 +6,11 @@ router.get('/', (req, res) => {
     res.render('index');
 });
 
+// Endpoint público para a Política de Privacidade (Necessário para a Verificação do Google)
+router.get('/privacidade', (req, res) => {
+    res.render('privacy');
+});
+
 // A rota captura o formulário, pega o telefone e redireciona (enviando o state na transação OAuth)
 router.post('/connect', (req, res) => {
     const { whatsappNumber } = req.body;
