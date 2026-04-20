@@ -56,8 +56,8 @@ const initWhatsApp = async () => {
         const sock = makeWASocket({
             auth: state,
             printQRInTerminal: false,
-            logger: pino({ level: 'silent' }), 
-            browser: ['Ubuntu', 'Chrome', '20.0.04'] // Aqui estava o pulo do gato! O WhatsApp barra nomes customizados e derruba a conexão!
+            logger: pino({ level: 'info' }), // Ativado para vasculhar porque a rede está bloqueando
+            browser: ['Ubuntu', 'Chrome', '20.0.04']
         });
 
         sock.ev.on('connection.update', async (update) => {
@@ -78,7 +78,7 @@ const initWhatsApp = async () => {
                 isReady = false;
                 
                 if (!isLogout) {
-                    console.log('🔄 Tentando reconectar silenciosamente...');
+                    console.log('🔄 Tentando reconectar silenciosamente. Motivo profundo:', lastDisconnect.error?.message, lastDisconnect.error);
                     setTimeout(connectToWhatsApp, 5000);
                 } else {
                     console.log('❌ O BOT FOI DESCONECTADO PELO CELULAR (LogOut)! Ele vai apagar a gaveta da nuvem...');
