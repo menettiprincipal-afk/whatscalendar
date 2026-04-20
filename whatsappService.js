@@ -48,6 +48,10 @@ const initWhatsApp = async () => {
 
     client.on('qr', (qr) => {
         console.log('🔴 QR RECEIVED - Para autenticar o BOT DISPARADOR, escaneie esse QR no terminal:');
+        console.log('🔗 OU COPIE O CÓDIGO ABAIXO E GERE O SEU QR EM UM SITE (ex: the-qrcode-generator.com):');
+        console.log('\n=============================================');
+        console.log(qr);
+        console.log('=============================================\n');
         qrcode.generate(qr, { small: true });
     });
 
