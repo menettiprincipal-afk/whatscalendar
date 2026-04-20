@@ -64,17 +64,20 @@
         }
 
         .logo-box {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
-            width: 70px;
-            height: 70px;
-            border-radius: 16px;
+            width: 100px;
+            height: 100px;
             display: flex;
             justify-content: center;
             align-items: center;
             margin: 0 auto 20px auto;
-            color: white;
-            font-size: 32px;
-            box-shadow: 0 8px 16px rgba(0, 230, 118, 0.2);
+        }
+        
+        .logo-box img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            /* drop-shadow ensures any transparency looks great */
+            filter: drop-shadow(0 8px 16px rgba(0, 230, 118, 0.2)); 
         }
 
         h1 { 
@@ -165,7 +168,9 @@
 <body>
     <div class="main-content">
         <div class="container">
-            <div class="logo-box">🗓️</div>
+            <div class="logo-box">
+                <img src="/logo/logo_sf.png" alt="WhatsCalendar Logo">
+            </div>
             <h1>WhatsCalendar</h1>
             <p>Conecte sua agenda e receba as notificações dos seus compromissos no WhatsApp todas as manhãs.</p>
             <form action="/connect" method="POST">
