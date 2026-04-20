@@ -1,17 +1,19 @@
-# Arquitetura e Estrutura: WhatsApp Calendar Middleware
+# WhatsCalendar Architecture
 
-# 1. Visão Geral
-Aplicação monolítica em Node.js usando Express, servindo como "middleware" entre a API do Google Calendar e o WhatsApp. O serviço autentica e coleta permissão de calendário de usuários usando Google OAuth2, lê suas agendas diariamente (07:00 AM originariamente), e dispara os compromissos do dia no Whatsapp usando o WWebJS headless.
+## Integrações
+1. **Baileys (WebSockets WhatsApp)**: Usado para enviar as agendas via canal WhatsApp individualmente para cada usuário. A sessão é persistida em `String` no MongoDB Atlas para prevenir `SessionError` após reiniciar a VM do Render.
+2. **Google OAuth 2.0**: O usuário faz logon após inputar o WhatsApp, nos dá permissão de escopo `.readonly` (e e-mail para exibirmos no painel). Os tokens (access_token, refresh_token) são guardados no MongoDB individualmente.
+3. **MongoDB Atlas (Mongoose)**: Banco principal armazenando sessões Baileys (`AuthState`) e os usuários (`Users`) com seus respectivos tokens e `preferredTime`.
+4. **Node-Cron**: O `cronService.js` inicializa uma task cron executada a cada minuto na porta da VM para investigar se existe algum usuário daquele minuto e chamar o `runRoutineForUsers`. Adminstrador pode atirar pra todo mundo agnosticamente pelo Dashboard via `/force-cron`.
 
-# 2. Infraestrutura e Hospedagem
-- **Ambiente Desempenhado**: VPS Linux, Render ou Railway. O Puppeteer foi modificado para executar com as flags `--no-sandbox` e `--disable-setuid-sandbox`.
-- **Persistência Global da Sessão**: MongoDB usando Atlas Clusters e a biblioteca `wwebjs-mongo`, garantindo que toda a sessão do WhatsApp fique na nuvem e o QR Code precise ser lido apenas 1 única vez para toda a vida do projeto.
-- **Armazenamento de BD**: Uso direto da Connection String longa do Atlas (non-SRV) para esquivar de limites DNS em certas VPS/bandas largas.
+## Componentes
 
-# 3. Soluções e Handlers Adicionados
-- [x] **Tratamento de Contato / Lid**: Formatação explícita validada (`+55`) garantindo envios perfeitos no BR. Adicionado auto validation do DDD com o `.getNumberId()`.
-- [x] **Handler do RemoteAuth**: Criada rotina autônoma com *setInterval* (Cão de Guarda) checando a constância do diretório temporário (`/Default`) para corrigir o bug de scan dir onde o navegador cronicamente excluia a pasta antes de um backup de sessão.
+### Frontend (`index.ejs` & `admin.ejs`)
+- `index.ejs`: Recebe um input mascarado do WhatsApp do usuário e o seu horário preferido via um formulário interligado por route parameters. A UI implementa Flat Design com Drop Shadow.
+- `admin.ejs`: Dashboard simplificado (protegido por senha ambiente) listando todos os usuários e provendo a funcionalidade individual (`📤 Enviar Agenda`) e master-trigger (`🚀 Disparar Agendas`).
 
-# 4. Funcionalidades e UX
-- **Painel Administrativo (`/admin`)**: Visualização em lista dos usuários, permissão para apagar da base e *o principal*: botão integrado **"🚀 Disparar Agendas"** que força uma leitura do banco de dados na hora, simulando o comportamento original do cron de 7h e enviando notificações imediatamente.
-- **Sincronização Cronológica**: `node-cron` controlando a assiduidade de envios. Timezone forçado no script para evitar desalinhamento.
+### Backend (`app.js` -> `server.js`)
+- Express webserver rodando na porta dinâmica do Render
+- `calendarService.js`: Motor do Google Auth2 e extrator da agenda (`calendar.events.list(...)`).
+- `whatsappService.js`: Motor WebSocket usando Baileys + Mongoose Adapter para enviar os eventos em forma de texto no formato `- [HH:MM]: <Titulo>`.
+- `cronService.js`: Agendador e loop por usuário rodando internamente assíncrono para enviar as rotinas.

@@ -64,8 +64,8 @@
         }
 
         .logo-box {
-            width: 100px;
-            height: 100px;
+            width: 250px;
+            height: 250px;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -101,7 +101,7 @@
             gap: 15px;
         }
 
-        input[type="text"] {
+        input[type="text"], input[type="time"] {
             width: 100%;
             padding: 16px;
             background: #F4F7FE;
@@ -112,9 +112,10 @@
             box-sizing: border-box;
             outline: none;
             transition: all 0.3s ease;
+            font-family: 'Inter', sans-serif;
         }
 
-        input[type="text"]:focus {
+        input[type="text"]:focus, input[type="time"]:focus {
             background: #FFFFFF;
             border-color: var(--primary);
             box-shadow: 0 0 0 4px rgba(0, 230, 118, 0.15);
@@ -174,13 +175,34 @@
             <h1>WhatsCalendar</h1>
             <p>Conecte sua agenda e receba as notificações dos seus compromissos no WhatsApp todas as manhãs.</p>
             <form action="/connect" method="POST">
-                <input type="text" name="whatsappNumber" placeholder="WhatsApp (DDD + Número)" required>
+                <input type="text" id="whatsappInput" name="whatsappNumber" placeholder="55 (11) 99999-9999" required maxlength="19">
+                <label style="text-align: left; font-size: 13px; color: var(--text-gray); margin-bottom: -10px; font-weight: 500;">Qual horário (Brasília) você deseja receber a agenda?</label>
+                <input type="time" name="preferredTime" value="07:00" required>
                 <button type="submit">Conectar Google Agenda</button>
             </form>
-            <div style="margin-top: 25px; text-align: center;">
+            <div style="margin-top: 25px; text-align: center; display: flex; justify-content: center; gap: 20px;">
                 <a href="https://whatscalendar-1.onrender.com/privacidade" style="color: #A3AED0; font-size: 13px; text-decoration: underline;">Privacy Policy</a>
+                <a href="/admin" style="color: #A3AED0; font-size: 13px; text-decoration: underline;">Acesso Admin</a>
             </div>
         </div>
     </div>
+    <script>
+        const whatsappInput = document.getElementById('whatsappInput');
+        whatsappInput.addEventListener('input', function(e) {
+            let x = e.target.value.replace(/\D/g, '');
+            if (x.length > 0) {
+                if (x.length <= 2) {
+                    x = x; 
+                } else if (x.length <= 4) {
+                    x = x.replace(/^(\d{2})(\d+)/, "$1 ($2");
+                } else if (x.length <= 9) {
+                    x = x.replace(/^(\d{2})(\d{2})(\d+)/, "$1 ($2) $3");
+                } else {
+                    x = x.replace(/^(\d{2})(\d{2})(\d{5})(\d{0,4}).*/, "$1 ($2) $3-$4");
+                }
+            }
+            e.target.value = x;
+        });
+    </script>
 </body>
 </html>

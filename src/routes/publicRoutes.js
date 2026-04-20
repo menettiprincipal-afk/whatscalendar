@@ -13,27 +13,30 @@ router.get('/privacidade', (req, res) => {
 
 // A rota captura o formulário, pega o telefone e redireciona (enviando o state na transação OAuth)
 router.post('/connect', (req, res) => {
-    const { whatsappNumber } = req.body;
+    const { whatsappNumber, preferredTime } = req.body;
     if (!whatsappNumber || whatsappNumber.trim().length < 10) {
         return res.send('<h1>Erro</h1><p>Digite um número de WhatsApp válido, ex: 5511999999999</p>');
     }
     
-    const url = getAuthUrl(whatsappNumber.trim());
+    // Encoda o número de telefone e o horário preferido no state do OAuth
+    const state = `${whatsappNumber.trim()}|${preferredTime || '17:00'}`;
+    const url = getAuthUrl(state);
     res.redirect(url);
 });
 
 // Callback nativo das credenciais do Google Workspace
 router.get('/api/calendar/callback', async (req, res) => {
     const code = req.query.code;
-    const whatsappNumber = req.query.state; 
+    const rawState = req.query.state || '';
+    const [whatsappNumber, preferredTime] = rawState.split('|'); 
 
     try {
-        await handleCallback(code, whatsappNumber);
+        await handleCallback(code, whatsappNumber, preferredTime);
         res.send(`
             <div style="font-family: sans-serif; text-align: center; max-width: 400px; margin: 50px auto; padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
                 <h2 style="color: #25D366;">Conectado com Sucesso!</h2>
                 <p>O número <b>${whatsappNumber}</b> foi vinculado ao seu Google Calendar.</p>
-                <p>Você começará a receber os seus compromissos todos os dias às 07:00 da manhã no WhatsApp.</p>
+                <p>Você começará a receber a sua agenda de compromissos todos os dias às <b>${preferredTime || '17:00'}</b> diretamente no seu WhatsApp.</p>
             </div>
         `);
     } catch (err) {

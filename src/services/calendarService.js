@@ -9,7 +9,7 @@ const getOAuthClient = () => {
   );
 };
 
-const getAuthUrl = (whatsappNumber) => {
+const getAuthUrl = (stateData) => {
   const oauth2Client = getOAuthClient();
   const scopes = [
     'https://www.googleapis.com/auth/calendar.readonly', 
@@ -19,11 +19,11 @@ const getAuthUrl = (whatsappNumber) => {
     access_type: 'offline',
     prompt: 'consent',
     scope: scopes,
-    state: whatsappNumber // Passamos o telefone para resgatar no callback
+    state: stateData // Passamos o dado de estado completo para resgate
   });
 };
 
-const handleCallback = async (code, whatsappNumber) => {
+const handleCallback = async (code, whatsappNumber, preferredTime) => {
   const oauth2Client = getOAuthClient();
   const { tokens } = await oauth2Client.getToken(code);
   
@@ -36,6 +36,9 @@ const handleCallback = async (code, whatsappNumber) => {
     user = new User({ whatsappNumber });
   }
   user.calendarEmail = userInfo.data.email;
+  if (preferredTime) {
+      user.preferredTime = preferredTime;
+  }
   // IMPORTANTE: Só atualiza os tokens se veio um refresh token novo (prompt: consent forçou isso)
   if (tokens.refresh_token) {
     user.googleTokens = tokens;

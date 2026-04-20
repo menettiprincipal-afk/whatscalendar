@@ -17,6 +17,10 @@ const UserSchema = new mongoose.Schema({
     token_type: String,
     expiry_date: Number
   },
+  preferredTime: {
+    type: String,
+    default: '17:00'
+  },
   createdAt: {
     type: Date,
     default: Date.now

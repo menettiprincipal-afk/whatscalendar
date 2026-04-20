@@ -6,7 +6,7 @@ const qrcode = require('qrcode-terminal');
 // 1. Schema do MongoDB para salvar os estados do WhatsApp
 const AuthStateSchema = new mongoose.Schema({
     _id: String,
-    data: mongoose.Schema.Types.Mixed
+    data: String // Mudado de Mixed para String puro (Protege a integridade dos Buffers binários do WhatsApp)
 }, { _id: false });
 const AuthStateModel = mongoose.models.AuthState || mongoose.model('AuthState', AuthStateSchema);
 
@@ -15,8 +15,8 @@ async function useMongoDBAuthState(sessionId) {
     const writeData = async (data, id) => {
         try {
             const documentId = `${sessionId}-${id}`;
-            const parsedData = JSON.parse(JSON.stringify(data, BufferJSON.replacer));
-            await AuthStateModel.replaceOne({ _id: documentId }, { _id: documentId, data: parsedData }, { upsert: true });
+            const str = JSON.stringify(data, BufferJSON.replacer);
+            await AuthStateModel.replaceOne({ _id: documentId }, { _id: documentId, data: str }, { upsert: true });
         } catch (error) {
             console.error('Error writing auth state to DB:', error);
         }
@@ -26,8 +26,8 @@ async function useMongoDBAuthState(sessionId) {
         try {
             const documentId = `${sessionId}-${id}`;
             const doc = await AuthStateModel.findOne({ _id: documentId });
-            if (doc) {
-                return JSON.parse(JSON.stringify(doc.data), BufferJSON.reviver);
+            if (doc && doc.data) {
+                return JSON.parse(doc.data, BufferJSON.reviver);
             }
         } catch (error) {
             console.error('Error reading auth state from DB:', error);
@@ -167,7 +167,9 @@ const sendMessage = async (whatsappNumber, messageText) => {
     }
     
     let cleanNumber = whatsappNumber.replace(/\D/g, '');
-    if (cleanNumber.length <= 11) {
+    if (!cleanNumber.startsWith('55')) {
+        // Se começou com 0 (ex: 011), tira o zero primeiro
+        if (cleanNumber.startsWith('0')) cleanNumber = cleanNumber.substring(1);
         cleanNumber = `55${cleanNumber}`;
     }
 

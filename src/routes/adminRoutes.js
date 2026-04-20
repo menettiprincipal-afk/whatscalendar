@@ -34,10 +34,7 @@ router.get('/logout', (req, res) => {
 router.get('/', checkAdmin, async (req, res) => {
     try {
         const users = await User.find().sort({ createdAt: -1 });
-        let scheduleConfig = await SystemConfig.findOne({ key: 'CRON_SCHEDULE' });
-        const cronTime = scheduleConfig ? scheduleConfig.value : '17:00';
-
-        res.render('admin', { users, cronTime });
+        res.render('admin', { users });
     } catch (error) {
         res.status(500).send('Erro ao buscar lista de usuários.');
     }
@@ -52,22 +49,17 @@ router.post('/delete/:id', checkAdmin, async (req, res) => {
     }
 });
 
-router.post('/schedule', checkAdmin, async (req, res) => {
+router.post('/force-user-cron/:id', checkAdmin, async (req, res) => {
     try {
-        const { time } = req.body;
-        // Validação simples (HH:MM)
-        if (/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(time)) {
-            await SystemConfig.findOneAndUpdate(
-                { key: 'CRON_SCHEDULE' },
-                { value: time },
-                { upsert: true }
-            );
-            // Recarrega o cron do zero no servidor para abraçar o novo horário na mesma hora
-            await initCron(); 
+        const { runRoutineForUsers } = require('../services/cronService');
+        const user = await User.findById(req.params.id);
+        if (user && user.googleTokens && user.googleTokens.access_token) {
+            runRoutineForUsers([user]);
         }
-        res.redirect('/admin');
+        setTimeout(() => res.redirect('/admin'), 1000);
     } catch (err) {
-        res.status(500).send('Erro ao alterar horário.');
+        console.error(err);
+        res.status(500).send('Erro ao disparar rotina para usuário.');
     }
 });
 

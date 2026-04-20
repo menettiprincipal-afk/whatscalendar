@@ -30,24 +30,17 @@
             </div>
         </div>
 
-        <div style="background: #f8f9fa; border: 1px solid #e4e6eb; padding: 15px; border-radius: 8px; margin-bottom: 25px; display: flex; align-items: center; justify-content: space-between;">
-            <div>
-                <strong style="display: block; margin-bottom: 5px;">⏰ Horário de Disparo das Agendas</strong>
-                <span style="font-size: 13px; color: #65676B;">Os usuários receberão a agenda do <strong>dia seguinte</strong> pontualmente neste horário.</span>
-            </div>
-            <form action="/admin/schedule" method="POST" style="margin:0; display:flex; gap: 10px;">
-                <input type="time" name="time" value="<%= cronTime %>" required style="padding: 8px; border: 1px solid #ccd0d5; border-radius: 5px; font-size: 14px; font-family: 'Inter', sans-serif;">
-                <button type="submit" style="background: #1877F2; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold;">Salvar Horário</button>
-            </form>
+        <div style="background: #f8f9fa; border: 1px solid #e4e6eb; padding: 15px; border-radius: 8px; margin-bottom: 25px;">
+            <strong style="display: block; margin-bottom: 5px;">ℹ️ Disparo de Agendas</strong>
+            <span style="font-size: 13px; color: #65676B;">Cada usuário recebe a agenda automaticamente de acordo com o horário que escolheu durante o cadastro. O botão global "Disparar Agendas" ignora essas regras e envia para todos de uma só vez. Alternativamente, você pode usar os botões "Enviar Agenda" individuais na tabela.</span>
         </div>
-        
         <table>
             <thead>
                 <tr>
                     <th>Número WhatsApp</th>
                     <th>E-mail Connectado</th>
+                    <th>Horário</th>
                     <th>Token Local</th>
-                    <th>Cadastrado Em</th>
                     <th>Ações</th>
                 </tr>
             </thead>
@@ -59,6 +52,7 @@
                     <tr>
                         <td><strong><%= user.whatsappNumber %></strong></td>
                         <td><%= user.calendarEmail || 'Aguardando Sinc Google...' %></td>
+                        <td><%= user.preferredTime || '17:00' %></td>
                         <td>
                             <% if (user.googleTokens && user.googleTokens.access_token) { %>
                                 <span class="badge-active">Autorizado</span>
@@ -66,11 +60,15 @@
                                 <span class="badge-pending">Pendente OAuth</span>
                             <% } %>
                         </td>
-                        <td><%= user.createdAt.toLocaleDateString('pt-BR') %></td>
                         <td>
-                            <form action="/admin/delete/<%= user._id %>" method="POST" style="margin:0;" onsubmit="return confirm('ATENÇÃO: Deletar este usuário vai cancelar o cronjob vitalício dele. Você tem certeza?');">
-                                <button type="submit" class="btn-delete">Remover Conta</button>
-                            </form>
+                            <div style="display: flex; gap: 5px;">
+                                <form action="/admin/force-user-cron/<%= user._id %>" method="POST" style="margin:0;" onsubmit="return confirm('Deseja enviar a agenda para este usuário agora?');">
+                                    <button type="submit" style="background: #1877F2; color: white; border: none; padding: 8px 10px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 12px;">📤 Enviar Agenda</button>
+                                </form>
+                                <form action="/admin/delete/<%= user._id %>" method="POST" style="margin:0;" onsubmit="return confirm('ATENÇÃO: Deletar este usuário vai cancelar o acesso dele. Você tem certeza?');">
+                                    <button type="submit" class="btn-delete" style="font-size: 12px;">🗑️ Remover</button>
+                                </form>
+                            </div>
                         </td>
                     </tr>
                 <% }) %>
