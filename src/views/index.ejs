@@ -4,78 +4,180 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="ABJP0tmcFFoBAAvs9LJqvDWqY358NyoEZCn3msywQZc" />
-    <title>Sincronizar Calendário via WhatsApp</title>
+    <title>WhatsCalendar - Sincronização Inteligente</title>
     <style>
+        :root {
+            --primary: #00E676;
+            --primary-dark: #00C853;
+            --accent: #2979FF;
+            --bg: #F4F7FE;
+            --text-dark: #2B3674;
+            --text-gray: #A3AED0;
+            --card-bg: #FFFFFF;
+        }
+
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-            background-color: #f0f2f5;
-            color: #1c1e21;
+            background: var(--bg);
+            background-image: linear-gradient(135deg, #F4F7FE 0%, #E2EDF8 100%);
+            color: var(--text-dark);
             display: flex;
-            justify-content: center;
+            flex-direction: column;
+            justify-content: space-between;
             align-items: center;
             min-height: 100vh;
             margin: 0;
+            padding: 0;
         }
+
+        .main-content {
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
         .container {
-            background: #fff;
-            padding: 40px;
-            border-radius: 12px;
-            box-shadow: 0 4px 14px rgba(0,0,0,0.06);
-            max-width: 380px;
+            background: var(--card-bg);
+            padding: 40px 30px;
+            border-radius: 20px;
+            box-shadow: 0 18px 40px rgba(112, 144, 176, 0.12);
+            max-width: 400px;
             width: 100%;
             text-align: center;
+            position: relative;
+            overflow: hidden;
         }
-        h1 { font-weight: 600; font-size: 22px; margin-bottom: 20px; }
-        p { color: #65676B; font-size: 14px; margin-bottom: 30px; line-height: 1.5; }
+
+        /* Subtle Top Gradient Line */
+        .container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 5px;
+            background: linear-gradient(90deg, var(--accent), var(--primary));
+        }
+
+        .logo-box {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            width: 70px;
+            height: 70px;
+            border-radius: 16px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0 auto 20px auto;
+            color: white;
+            font-size: 32px;
+            box-shadow: 0 8px 16px rgba(0, 230, 118, 0.2);
+        }
+
+        h1 { 
+            font-weight: 700; 
+            font-size: 24px; 
+            margin-bottom: 12px; 
+            letter-spacing: -0.5px;
+        }
+
+        p { 
+            color: var(--text-gray); 
+            font-size: 14px; 
+            margin-bottom: 30px; 
+            line-height: 1.6; 
+            font-weight: 400;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
         input[type="text"] {
             width: 100%;
-            padding: 14px 14px;
-            margin-bottom: 20px;
-            border: 1px solid #ced4da;
-            border-radius: 6px;
-            font-size: 16px;
+            padding: 16px;
+            background: #F4F7FE;
+            border: 1px solid transparent;
+            border-radius: 12px;
+            font-size: 15px;
+            color: var(--text-dark);
             box-sizing: border-box;
             outline: none;
-            transition: all 0.2s;
+            transition: all 0.3s ease;
         }
+
         input[type="text"]:focus {
-            border-color: #25D366;
-            box-shadow: 0 0 0 3px rgba(37, 211, 102, 0.2);
+            background: #FFFFFF;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(0, 230, 118, 0.15);
         }
+
         button {
             width: 100%;
-            background-color: #25D366;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
             color: white;
-            padding: 14px;
+            padding: 16px;
             border: none;
-            border-radius: 6px;
-            font-size: 15px;
+            border-radius: 12px;
+            font-size: 16px;
             font-weight: 600;
             cursor: pointer;
-            transition: background-color 0.2s;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 16px rgba(0, 200, 83, 0.2);
         }
-        button:hover { background-color: #1DA851; }
-        footer {
-            margin-top: 40px;
-            font-size: 14px;
-            text-align: center;
+
+        button:hover { 
+            transform: translateY(-2px);
+            box-shadow: 0 12px 20px rgba(0, 200, 83, 0.3);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        /* Footer Google Auth Requirement */
+        .footer-links {
             width: 100%;
+            padding: 20px 0;
+            text-align: center;
+            background-color: transparent;
+        }
+
+        .footer-links a {
+            color: var(--text-gray);
+            font-size: 13px;
+            text-decoration: underline;
+            margin: 0 10px;
+            font-weight: 500;
+            transition: color 0.2s ease;
+        }
+
+        .footer-links a:hover {
+            color: var(--text-dark);
         }
     </style>
 </head>
 <body>
-    <div style="display: flex; flex-direction: column; align-items: center; padding: 20px; width: 100%;">
+    <div class="main-content">
         <div class="container">
-            <h1>Seu Google Calendar no WhatsApp</h1>
-            <p>Preencha seu número e autorize o calendário. Receba as notificações diárias de seus compromissos no seu celular toda manhã de forma orgânica e silenciosa.</p>
+            <div class="logo-box">🗓️</div>
+            <h1>WhatsCalendar</h1>
+            <p>Conecte sua agenda e receba as notificações dos seus compromissos no WhatsApp todas as manhãs.</p>
             <form action="/connect" method="POST">
-                <input type="text" name="whatsappNumber" placeholder="Número (DDI, DDD e Telefone)" required>
-                <button type="submit">Conectar via Google</button>
+                <input type="text" name="whatsappNumber" placeholder="WhatsApp (DDD + Número)" required>
+                <button type="submit">Conectar Google Agenda</button>
             </form>
         </div>
-        <footer>
-            <a href="https://whatscalendar-1.onrender.com/privacidade" style="color: #0000EE; text-decoration: underline; font-weight: 500;">Política de Privacidade / Privacy Policy</a>
-        </footer>
     </div>
+    
+    <!-- Footer required by Google Trust & Safety -->
+    <footer class="footer-links" aria-label="Footer Navigation">
+        <a href="https://whatscalendar-1.onrender.com/privacidade">Privacy Policy</a>
+    </footer>
 </body>
 </html>
