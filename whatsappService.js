@@ -36,8 +36,8 @@ const initWhatsApp = async () => {
                 '--disable-accelerated-2d-canvas',
                 '--no-first-run',
                 '--no-zygote',
-                '--single-process', // A mais importante para diminuir consumo absurdo de RAM
-                '--disable-gpu'
+                '--disable-gpu',
+                '--js-flags="--max-old-space-size=150"' // Limite da própria inteligência do Chrome pra caber com folga nos 512 do Render
             ]
         },
         webVersionCache: {
