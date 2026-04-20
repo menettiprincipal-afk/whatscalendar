@@ -51,15 +51,18 @@ const handleCallback = async (code, whatsappNumber) => {
   return user;
 };
 
-const getTodaysEvents = async (userTokens) => {
+const getTomorrowsEvents = async (userTokens) => {
   const client = getOAuthClient();
   client.setCredentials(userTokens);
   const calendar = google.calendar({ version: 'v3', auth: client });
 
-  const startOfDay = new Date();
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  
+  const startOfDay = new Date(tomorrow);
   startOfDay.setHours(0, 0, 0, 0);
   
-  const endOfDay = new Date();
+  const endOfDay = new Date(tomorrow);
   endOfDay.setHours(23, 59, 59, 999);
 
   const res = await calendar.events.list({
@@ -73,4 +76,4 @@ const getTodaysEvents = async (userTokens) => {
   return res.data.items || [];
 };
 
-module.exports = { getAuthUrl, handleCallback, getTodaysEvents, getOAuthClient };
+module.exports = { getAuthUrl, handleCallback, getTomorrowsEvents, getOAuthClient };

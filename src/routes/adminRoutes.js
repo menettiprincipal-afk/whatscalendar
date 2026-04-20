@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
-const { runDailyRoutine } = require('../services/cronService');
+const SystemConfig = require('../models/SystemConfig');
+const { runDailyRoutine, initCron } = require('../services/cronService');
 
 const checkAdmin = (req, res, next) => {
     if (req.session && req.session.isAdmin) {
@@ -33,7 +34,10 @@ router.get('/logout', (req, res) => {
 router.get('/', checkAdmin, async (req, res) => {
     try {
         const users = await User.find().sort({ createdAt: -1 });
-        res.render('admin', { users });
+        let scheduleConfig = await SystemConfig.findOne({ key: 'CRON_SCHEDULE' });
+        const cronTime = scheduleConfig ? scheduleConfig.value : '17:00';
+
+        res.render('admin', { users, cronTime });
     } catch (error) {
         res.status(500).send('Erro ao buscar lista de usuários.');
     }
@@ -45,6 +49,25 @@ router.post('/delete/:id', checkAdmin, async (req, res) => {
         res.redirect('/admin');
     } catch (err) {
         res.status(500).send('Erro ao excluir usuário');
+    }
+});
+
+router.post('/schedule', checkAdmin, async (req, res) => {
+    try {
+        const { time } = req.body;
+        // Validação simples (HH:MM)
+        if (/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(time)) {
+            await SystemConfig.findOneAndUpdate(
+                { key: 'CRON_SCHEDULE' },
+                { value: time },
+                { upsert: true }
+            );
+            // Recarrega o cron do zero no servidor para abraçar o novo horário na mesma hora
+            await initCron(); 
+        }
+        res.redirect('/admin');
+    } catch (err) {
+        res.status(500).send('Erro ao alterar horário.');
     }
 });
 
