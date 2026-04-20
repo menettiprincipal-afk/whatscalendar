@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Gestão da Automação</title>
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #f0f2f5; margin: 0; padding: 20px; color: #1c1e21; }
+        .wrapper { max-width: 900px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e4e6eb; padding-bottom: 20px; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 14px 15px; text-align: left; border-bottom: 1px solid #e4e6eb; }
+        th { background: #fafafa; font-weight: 600; font-size: 14px; color: #65676B;}
+        td { font-size: 14px; }
+        .btn-delete { background: #FA383E; color: white; border: none; padding: 8px 14px; border-radius: 5px; cursor: pointer; font-weight: bold;}
+        .btn-delete:hover { background: #d02a2f; }
+        .badge-active { background: #E7F3EB; color: #1FA64D; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+        .badge-pending { background: #FEF2D5; color: #E7A310; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <div class="header">
+            <h2>Gestão de Contas (WhatsApp Middleware)</h2>
+            <div style="display: flex; gap: 15px; align-items: center;">
+                <form action="/admin/force-cron" method="POST" style="margin:0;" onsubmit="return confirm('ATENÇÃO: Disparar envio de agendas agora? Isso lerá os calendários de todas as contas autorizadas e as enviará as mensagens imediatamente via WhatsApp.');">
+                    <button type="submit" style="background:#1FA64D; color:white; border:none; padding:10px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">🚀 Disparar Agendas</button>
+                </form>
+                <a href="/admin/logout" style="color: #65676B; text-decoration: none; font-weight:bold;">🚪 Desconectar</a>
+            </div>
+        </div>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Número WhatsApp</th>
+                    <th>E-mail Connectado</th>
+                    <th>Token Local</th>
+                    <th>Cadastrado Em</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% if (users.length === 0) { %>
+                    <tr><td colspan="5" style="text-align:center; padding: 30px; color: #666;">Ainda não há clientes cadastrados na plataforma.</td></tr>
+                <% } %>
+                <% users.forEach(user => { %>
+                    <tr>
+                        <td><strong><%= user.whatsappNumber %></strong></td>
+                        <td><%= user.calendarEmail || 'Aguardando Sinc Google...' %></td>
+                        <td>
+                            <% if (user.googleTokens && user.googleTokens.access_token) { %>
+                                <span class="badge-active">Autorizado</span>
+                            <% } else { %>
+                                <span class="badge-pending">Pendente OAuth</span>
+                            <% } %>
+                        </td>
+                        <td><%= user.createdAt.toLocaleDateString('pt-BR') %></td>
+                        <td>
+                            <form action="/admin/delete/<%= user._id %>" method="POST" style="margin:0;" onsubmit="return confirm('ATENÇÃO: Deletar este usuário vai cancelar o cronjob vitalício dele. Você tem certeza?');">
+                                <button type="submit" class="btn-delete">Remover Conta</button>
+                            </form>
+                        </td>
+                    </tr>
+                <% }) %>
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>
