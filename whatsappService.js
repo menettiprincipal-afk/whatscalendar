@@ -1,4 +1,4 @@
-const { default: makeWASocket, DisconnectReason, useMultiFileAuthState } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, DisconnectReason, useMultiFileAuthState, fetchLatestBaileysVersion, Browsers } = require('@whiskeysockets/baileys');
 const mongoose = require('mongoose');
 const pino = require('pino');
 const qrcode = require('qrcode-terminal');
@@ -20,7 +20,7 @@ const sessionDir = path.join(process.cwd(), 'baileys_auth');
 async function downloadSession() {
     try {
         const doc = await BaileysAuth.findOne({ id: 'meu-bot-v2' });
-        if (doc && doc.files) {
+        if (doc && doc.files && doc.files.size > 0) {
             if (!fs.existsSync(sessionDir)) fs.mkdirSync(sessionDir, { recursive: true });
             for (let [filename, content] of doc.files.entries()) {
                 fs.writeFileSync(path.join(sessionDir, filename), content, 'base64');
@@ -51,13 +51,18 @@ const initWhatsApp = async () => {
 
     // Passamos pro Baileys oficial ler como ele entende melhor (Nativamente)
     const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
+    
+    // 🔥 BUSCA A ÚLTIMA VERSÃO OFICIAL DO WHATSAPP ANTES DE CONECTAR
+    const { version, isLatest } = await fetchLatestBaileysVersion();
+    console.log(`📡 Disfarçando servidor com WA Web Oficial v${version.join('.')} (isLatest: ${isLatest})`);
 
     const connectToWhatsApp = () => {
         const sock = makeWASocket({
+            version, // O WhatsApp vai aceitar a conexão imediatamente por não ser versão defasada
             auth: state,
             printQRInTerminal: false,
-            logger: pino({ level: 'info' }), // Ativado para vasculhar porque a rede está bloqueando
-            browser: ['Ubuntu', 'Chrome', '20.0.04']
+            logger: pino({ level: 'silent' }), // Deixado silencioso
+            browser: Browsers.macOS('Desktop') // Usa o agente de navegador OFICIAL DO PRÓPRIO BAILEYS!
         });
 
         sock.ev.on('connection.update', async (update) => {
