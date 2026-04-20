@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Política de Privacidade - WhatsApp Calendar</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        h1, h2, h3 {
+            color: #25D366;
+        }
+        .container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        p {
+            margin-bottom: 15px;
+        }
+        ul {
+            margin-bottom: 15px;
+            padding-left: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Política de Privacidade</h1>
+        <p><strong>Última atualização:</strong> 20 de Abril de 2026</p>
+
+        <p>Bem-vindo ao <strong>WhatsApp Calendar Middleware</strong> ("nós", "nosso" ou "aplicativo"). Temos o compromisso de proteger sua privacidade e seus dados. Esta Política de Privacidade explica como coletamos, usamos, divulgamos e protegemos suas informações ao utilizar nosso serviço de integração entre o Google Calendar e o WhatsApp.</p>
+
+        <h2>1. Informações que Coletamos</h2>
+        <p>Ao utilizar nosso serviço, conectando sua conta Google para receber notificações no WhatsApp, nós coletamos os seguintes dados restritos e estritamente necessários para o funcionamento core do serviço:</p>
+        <ul>
+            <li><strong>Número do WhatsApp:</strong> Coletado ativamente quando você insere os dados para configurar os alertas em sua conta.</li>
+            <li><strong>Endereço de E-mail (Dados de Perfil do Google):</strong> Utilizado unicamente para identificar a qual conta de calendário a sua sessão pertence.</li>
+            <li><strong>Eventos do Calendário (Acesso de Leitura):</strong> Processamos de forma efêmera e contínua apenas os seus compromissos agendados para o dia de amanhã. Não guardamos um histórico geral, apenas processamos a grade diária em memória para despachar o aviso sistêmico.</li>
+            <li><strong>Tokens de Acesso OAuth:</strong> Tokens de atualização e autorização cedidos pelo Google que nos permitem consultar de forma assíncrona as agendas dos usuários todos os dias de maneira automatizada.</li>
+        </ul>
+
+        <h2>2. Como Usamos as Suas Informações</h2>
+        <p>Utilizamos os dados capturados estritamente com os seguintes propósitos organizacionais e técnicos:</p>
+        <ul>
+            <li>Fornecer a funcionalidade de pesquisar proativamente eventos registrados no Google Agenda pertinentes à data seguinte.</li>
+            <li>Despachar mensagens via API (WhatsApp) para o terminal/número registrado comunicando um resumo das atividades futuras para que o titular possa planejar seu dia.</li>
+            <li>Diagnosticar problemas técnicos que interfiram no fluxo de despacho diário das mensagens.</li>
+        </ul>
+
+        <h2>3. O Que NÃO Fazemos com Seus Dados</h2>
+        <ul>
+            <li><strong>Não Vendemos Dados:</strong> Suas informações, eventos da agenda e metadados nunca são cedidos, compartilhados, trocados ou vendidos a terceiros ou empresas de publicidade.</li>
+            <li><strong>Não Lemos as Mensagens do Usuário:</strong> Nós usamos bibliotecas de sistema apenas para envio programático de avisos e não gravamos de forma alguma mensagens de conversas do usuário geradas no WhatsApp.</li>
+            <li><strong>Não Escrevemos/Modificamos Sua Agenda:</strong> Possuímos acesso restrito à propriedade *Read Only* (Somente Leitura) de consulta a APIs do Google Calendar, impossibilitando exclusão, edição ou agendamento indevido no seu e-mail.</li>
+        </ul>
+
+        <h2>4. Armazenamento e Retenção de Dados</h2>
+        <p>A proteção dos seus dados ocorre por meio de persistência criptografada em nuvem. As chaves de Refresh Token emitidas pelas APIs do Google são armazenadas em conformidade com as regras do provedor (no formato blindado do MongoDB). Elas persistem enquanto o usuário concordar em se beneficiar dos lembretes automatizados. Caso revogado a permissão pelo seu painel do Gmail, os Tokens são invalidados automaticamente e instantaneamente.</p>
+
+        <h2>5. Permissões Requeridas (Especializadas do Google)</h2>
+        <p>Nosso aplicativo submete os seguintes escopos de autorização aos serviços de identidade do Google, seguindo a Resolução Restrita Oficial:</p>
+        <ul>
+            <li><code>https://www.googleapis.com/auth/calendar.readonly</code>: Permissão restritamente limitada a exibir os eventos sem capacidade de criação manual ou gerência total.</li>
+            <li><code>https://www.googleapis.com/auth/userinfo.email</code>: Identificador lógico para controle de banco de dados.</li>
+        </ul>
+
+        <h2>6. Fale Conosco ou Cancele o Acesso</h2>
+        <p>Caso tenha dúvidas, precise revogar instantaneamente qualquer autorização concedida ou exija exclusão do nosso banco de dados, você sempre tem o direito e total capacidade de fazê-lo destituindo o nosso software das suas Permissões de Conta Google em *myaccount.google.com/permissions*. Dúvidas técnicas via contatos ou formulários do administrador do aplicativo que ofereceu essa ferramenta publicamente a você.</p>
+    </div>
+</body>
+</html>
