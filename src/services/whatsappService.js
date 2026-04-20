@@ -1,93 +1,154 @@
-const { Client, RemoteAuth } = require('whatsapp-web.js');
-const { MongoStore } = require('wwebjs-mongo');
+const { default: makeWASocket, DisconnectReason, BufferJSON, initAuthCreds } = require('@whiskeysockets/baileys');
 const mongoose = require('mongoose');
+const pino = require('pino');
 const qrcode = require('qrcode-terminal');
-const fs = require('fs');
-const path = require('path');
 
-let client;
+const AuthDocSchema = new mongoose.Schema({
+    id: { type: String, unique: true },
+    data: { type: String }
+});
+const BaileysAuth = mongoose.models.BaileysAuth || mongoose.model('BaileysAuth', AuthDocSchema);
+
+let clientSocket = null;
 let isReady = false;
 
-const initWhatsApp = async () => {
-    console.log('🟡 Preparando instância do WhatsApp Web.js MODO HEADLESS na Nuvem...');
-    // A integração wwebjs-mongo usa a conexão ativa do mongoose
-    const store = new MongoStore({ mongoose: mongoose });
-    
-    // WORKAROUND: O RemoteAuth sofre com um bug onde o puppeteer ou ele mesmo deletam a pasta e causam ENOENT scandir na hora do backup.
-    // Garantimos que a pasta vai existir mantendo um check intervalar.
-    const sessionPath = path.join(process.cwd(), '.wwebjs_auth', 'wwebjs_temp_session_bot-calendario', 'Default');
-    setInterval(() => {
-        if (!fs.existsSync(sessionPath)) {
-            try { fs.mkdirSync(sessionPath, { recursive: true }); } catch (e) {}
-        }
-    }, 10000); // Checa a cada 10s e recria se não existir.
+// 🧠 NOSSA MÁGICA: Adaptador de Sessão Baileys Direto pro Mongo (Fim do Zip Gigante de 150mb)
+async function useMongoAuthState(sessionId) {
+    const writeData = async (data, id) => {
+        const str = JSON.stringify(data, BufferJSON.replacer);
+        await BaileysAuth.updateOne({ id: `${sessionId}-${id}` }, { $set: { data: str } }, { upsert: true });
+    };
 
-    client = new Client({
-        authStrategy: new RemoteAuth({
-            clientId: 'bot-calendario',
-            store: store,
-            backupSyncIntervalMs: 300000 // A cada 5min salva no MongoDB para não perder a sessão no cloud.
-        }),
-        puppeteer: {
-            args: ['--no-sandbox', '--disable-setuid-sandbox'] // Essencial para rodar no Render, Railway, VPS
+    const readData = async (id) => {
+        const doc = await BaileysAuth.findOne({ id: `${sessionId}-${id}` });
+        if (!doc) return null;
+        return JSON.parse(doc.data, BufferJSON.reviver);
+    };
+
+    const removeData = async (id) => {
+        await BaileysAuth.deleteOne({ id: `${sessionId}-${id}` });
+    };
+
+    let creds = await readData('creds');
+    if (!creds) {
+        creds = initAuthCreds();
+        await writeData(creds, 'creds');
+    }
+
+    return {
+        state: {
+            creds,
+            keys: {
+                get: async (type, ids) => {
+                    const data = {};
+                    await Promise.all(
+                        ids.map(async id => {
+                            let value = await readData(`${type}-${id}`);
+                            if (type === 'app-state-sync-key' && value) {
+                                value = require('@whiskeysockets/baileys').proto.Message.AppStateSyncKeyData.fromObject(value);
+                            }
+                            data[id] = value;
+                        })
+                    );
+                    return data;
+                },
+                set: async (data) => {
+                    const tasks = [];
+                    for (const category in data) {
+                        for (const id in data[category]) {
+                            const value = data[category][id];
+                            const key = `${category}-${id}`;
+                            if (value) {
+                                tasks.push(writeData(value, key));
+                            } else {
+                                tasks.push(removeData(key));
+                            }
+                        }
+                    }
+                    await Promise.all(tasks);
+                }
+            }
         },
-        webVersionCache: {
-            type: 'remote',
-            remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
-        }
-    });
+        saveCreds: () => writeData(creds, 'creds')
+    }
+}
 
-    client.on('qr', (qr) => {
-        console.log('🔴 QR RECEIVED - Para autenticar o BOT DISPARADOR, escaneie esse QR no terminal:');
-        qrcode.generate(qr, { small: true });
-    });
-
-    client.on('remote_session_saved', () => {
-        console.log('☁️ Sessão do WhatsApp foi salva em segurança na nuvem (Mongoose Store).');
-    });
-
-    client.on('ready', () => {
-        console.log('🟢 WhatsApp Remetente ESTÁ PRONTO E CONECTADO!');
-        isReady = true;
-    });
-
-    client.on('auth_failure', msg => {
-        console.error('🔴 Falha fatal na autenticação do WhatsApp:', msg);
-    });
+const initWhatsApp = async () => {
+    console.log('🟡 Preparando instância do Baileys MODO ULTRA LIGHT SOCADO (Adeus Chrome!)...');
     
-    client.on('disconnected', (reason) => {
-        console.log('🔴 WhatsApp Desconectado! Motivo:', reason);
-        isReady = false;
-        // Dependendo do ambiente, às vezes necessita chamar client.initialize() novamente.
-    });
+    // Conectamos a autorização customizada usando a base de dados ativa
+    const { state, saveCreds } = await useMongoAuthState('robot-bot-v1');
 
-    client.initialize();
+    const connectToWhatsApp = () => {
+        const sock = makeWASocket({
+            auth: state,
+            printQRInTerminal: false,
+            logger: pino({ level: 'silent' }), // Deixa calado, senão ele vomita logs demais da conexão wifi rs
+            browser: ['Bot Calendario', 'Safari', '1.0.0']
+        });
+
+        sock.ev.on('connection.update', (update) => {
+            const { connection, lastDisconnect, qr } = update;
+            
+            if (qr) {
+                console.log('🔴 NOVO QR CODE GERADO. FAÇA A LEITURA PARA CONECTAR:');
+                console.log('🔗 OU COPIE O CÓDIGO BRUTO ABAIXO (site recomendado: br.qr-code-generator.com ou use o VSCode):');
+                console.log('\n=============================================');
+                console.log(qr);
+                console.log('=============================================\n');
+                qrcode.generate(qr, { small: true });
+            }
+
+            if (connection === 'close') {
+                const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut;
+                console.log('🔴 Conexão falhou/fechou. Motivo técnico:', (lastDisconnect.error)?.message);
+                isReady = false;
+                
+                if (shouldReconnect) {
+                    console.log('🔄 Tentando reconectar ao WhatsApp silenciosamente...');
+                    setTimeout(connectToWhatsApp, 5000);
+                } else {
+                    console.log('❌ O BOT FOI DESCONECTADO PELO CELULAR (LogOut)! Ele vai apagar a gaveta do mongo para o próximo QR...');
+                    mongoose.models.BaileysAuth.deleteMany({ id: { $regex: '^robot-bot-v1' } }).exec();
+                }
+            } else if (connection === 'open') {
+                console.log('🟢 WhatsApp LEVE E SUPREMO ESTÁ PRONTO E CONECTADO!');
+                isReady = true;
+                clientSocket = sock;
+            }
+        });
+
+        // Quando o whatsapp atualiza as chaves secretas de 10 em 10 min, forçamos o salvar pro Mongo:
+        sock.ev.on('creds.update', saveCreds);
+    };
+
+    connectToWhatsApp();
 };
 
 const sendMessage = async (whatsappNumber, messageText) => {
-    if (!isReady) {
-        console.warn('⚠️ WhatsApp ainda não está pronto para enviar mensagens. Ignorando envio para:', whatsappNumber);
+    if (!isReady || !clientSocket) {
+        console.warn('⚠️ WhatsApp não está pronto.');
         return false;
     }
     
-    // Tratamento robusto do número: remove tudo que não for dígito
+    // Higieniza
     let cleanNumber = whatsappNumber.replace(/\D/g, '');
-    
-    // Se o usuário digitou apenas DDD + número (ex: 11999999999) com 10 ou 11 dígitos, forçamos o "55" inicial do Brasil
     if (cleanNumber.length <= 11) {
         cleanNumber = `55${cleanNumber}`;
     }
 
-    const chatId = `${cleanNumber}@c.us`;
     try {
-        // Obter número serializado real caso o whatsapp tenha o numero com/sem o nono dígito (No LID fix)
-        const numberId = await client.getNumberId(cleanNumber);
-        if (!numberId) {
+        const jid = `${cleanNumber}@s.whatsapp.net`;
+        
+        // Verifica pra ver se a pessoa tem zap válido (Substitui o noLid getNumberId)
+        const [result] = await clientSocket.onWhatsApp(jid);
+        if (!result || !result.exists) {
             console.error(`❌ Número não possui WhatsApp ativo: ${cleanNumber}`);
             return false;
         }
 
-        await client.sendMessage(numberId._serialized, messageText);
+        // Manda de verdade, formato Baileys
+        await clientSocket.sendMessage(result.jid, { text: messageText });
         console.log(`📩 Mensagem enviada com sucesso para ${cleanNumber}`);
         return true;
     } catch (err) {

@@ -1,6 +1,5 @@
-FROM ghcr.io/puppeteer/puppeteer:latest
+FROM node:20-alpine
 
-USER root
 WORKDIR /app
 
 # Copia os arquivos de dependência
@@ -10,12 +9,6 @@ RUN npm install
 # Copia todo o código fonte
 COPY . .
 
-# Corrige as permissões para o usuário restrito não dar erro
-RUN chown -R pptruser:pptruser /app
-
-# Retorna para o usuário super restrito criado pela imagem Oficial
-USER pptruser
-
-# Expõe e Inicia
+# Expõe a porta e Inicia com limite leve pois nem precisamos mais
 EXPOSE 3001
 CMD ["node", "--max-old-space-size=150", "server.js"]
