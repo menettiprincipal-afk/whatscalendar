@@ -1,108 +1,129 @@
-const { Client, RemoteAuth } = require('whatsapp-web.js');
-const { MongoStore } = require('wwebjs-mongo');
+const { default: makeWASocket, DisconnectReason, useMultiFileAuthState } = require('@whiskeysockets/baileys');
 const mongoose = require('mongoose');
+const pino = require('pino');
 const qrcode = require('qrcode-terminal');
 const fs = require('fs');
 const path = require('path');
 
-let client;
+const AuthDocSchema = new mongoose.Schema({
+    id: { type: String, unique: true },
+    files: { type: Map, of: String }
+});
+const BaileysAuth = mongoose.models.BaileysAuth || mongoose.model('BaileysAuth', AuthDocSchema);
+
+let clientSocket = null;
 let isReady = false;
 
+// 🧠 NOSSA MÁGICA FINAL: Clonamos o diretório nativo para a nuvem
+const sessionDir = path.join(process.cwd(), 'baileys_auth');
+
+async function downloadSession() {
+    try {
+        const doc = await BaileysAuth.findOne({ id: 'meu-bot-v2' });
+        if (doc && doc.files) {
+            if (!fs.existsSync(sessionDir)) fs.mkdirSync(sessionDir, { recursive: true });
+            for (let [filename, content] of doc.files.entries()) {
+                fs.writeFileSync(path.join(sessionDir, filename), content, 'base64');
+            }
+        }
+    } catch (e) {
+        console.error('Falha ao baixar sessão:', e);
+    }
+}
+
+async function uploadSession() {
+    try {
+        if (!fs.existsSync(sessionDir)) return;
+        const files = fs.readdirSync(sessionDir);
+        const filesMap = {};
+        for (let file of files) {
+            filesMap[file] = fs.readFileSync(path.join(sessionDir, file)).toString('base64');
+        }
+        await BaileysAuth.updateOne({ id: 'meu-bot-v2' }, { $set: { files: filesMap } }, { upsert: true });
+    } catch (e) {}
+}
+
 const initWhatsApp = async () => {
-    console.log('🟡 Preparando instância do WhatsApp Web.js MODO HEADLESS na Nuvem...');
-    // A integração wwebjs-mongo usa a conexão ativa do mongoose
-    const store = new MongoStore({ mongoose: mongoose });
+    console.log('🟡 Preparando instância do Baileys...');
     
-    // WORKAROUND: O RemoteAuth sofre com um bug onde o puppeteer ou ele mesmo deletam a pasta e causam ENOENT scandir na hora do backup.
-    // Garantimos que a pasta vai existir mantendo um check intervalar.
-    const sessionPath = path.join(process.cwd(), '.wwebjs_auth', 'wwebjs_temp_session_bot-calendario', 'Default');
-    setInterval(() => {
-        if (!fs.existsSync(sessionPath)) {
-            try { fs.mkdirSync(sessionPath, { recursive: true }); } catch (e) {}
-        }
-    }, 10000); // Checa a cada 10s e recria se não existir.
+    // Baixamos arquivos antigos da nuvem (se tiver)
+    await downloadSession();
 
-    client = new Client({
-        authStrategy: new RemoteAuth({
-            clientId: 'chatbot-final-1', // Mudamos o nome para forçar o Mongo a não tentar baixar um zip imenso do passado, o que tava causando o estouro de memória!
-            store: store,
-            backupSyncIntervalMs: 300000 
-        }),
-        puppeteer: {
-            args: [
-                '--no-sandbox', 
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--no-first-run',
-                '--no-zygote',
-                '--disable-gpu',
-                '--disable-web-security',
-                '--disable-features=IsolateOrigins,site-per-process',
-                '--js-flags="--max-old-space-size=80"' // Mínimo do V8 para tentar sobreviver ao lado do NodeJS
-            ]
-        },
-        webVersionCache: {
-            type: 'remote',
-            remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
-        }
-    });
+    // Passamos pro Baileys oficial ler como ele entende melhor (Nativamente)
+    const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
 
-    client.on('qr', (qr) => {
-        console.log('🔴 QR RECEIVED - Para autenticar o BOT DISPARADOR, escaneie esse QR no terminal:');
-        console.log('🔗 OU COPIE O CÓDIGO ABAIXO E GERE O SEU QR EM UM SITE (ex: the-qrcode-generator.com):');
-        console.log('\n=============================================');
-        console.log(qr);
-        console.log('=============================================\n');
-        qrcode.generate(qr, { small: true });
-    });
+    const connectToWhatsApp = () => {
+        const sock = makeWASocket({
+            auth: state,
+            printQRInTerminal: false,
+            logger: pino({ level: 'silent' }), 
+            browser: ['Ubuntu', 'Chrome', '20.0.04'] // Aqui estava o pulo do gato! O WhatsApp barra nomes customizados e derruba a conexão!
+        });
 
-    client.on('remote_session_saved', () => {
-        console.log('☁️ Sessão do WhatsApp foi salva em segurança na nuvem (Mongoose Store).');
-    });
+        sock.ev.on('connection.update', async (update) => {
+            const { connection, lastDisconnect, qr } = update;
+            
+            if (qr) {
+                console.log('🔴 NOVO QR CODE GERADO. FAÇA A LEITURA PARA CONECTAR:');
+                console.log('🔗 OU COPIE O CÓDIGO BRUTO ABAIXO (site recomendado: br.qr-code-generator.com ou use o VSCode):');
+                console.log('\n=============================================');
+                console.log(qr);
+                console.log('=============================================\n');
+                qrcode.generate(qr, { small: true });
+            }
 
-    client.on('ready', () => {
-        console.log('🟢 WhatsApp Remetente ESTÁ PRONTO E CONECTADO!');
-        isReady = true;
-    });
+            if (connection === 'close') {
+                const isLogout = (lastDisconnect.error)?.output?.statusCode === DisconnectReason.loggedOut;
+                
+                isReady = false;
+                
+                if (!isLogout) {
+                    console.log('🔄 Tentando reconectar silenciosamente...');
+                    setTimeout(connectToWhatsApp, 5000);
+                } else {
+                    console.log('❌ O BOT FOI DESCONECTADO PELO CELULAR (LogOut)! Ele vai apagar a gaveta da nuvem...');
+                    await BaileysAuth.deleteOne({ id: 'meu-bot-v2' });
+                    try { fs.rmSync(sessionDir, { recursive: true, force: true }); } catch(e){}
+                }
+            } else if (connection === 'open') {
+                console.log('🟢 WhatsApp LEVE E SUPREMO ESTÁ PRONTO E CONECTADO!');
+                isReady = true;
+                clientSocket = sock;
+                await uploadSession();
+            }
+        });
 
-    client.on('auth_failure', msg => {
-        console.error('🔴 Falha fatal na autenticação do WhatsApp:', msg);
-    });
-    
-    client.on('disconnected', (reason) => {
-        console.log('🔴 WhatsApp Desconectado! Motivo:', reason);
-        isReady = false;
-        // Dependendo do ambiente, às vezes necessita chamar client.initialize() novamente.
-    });
+        // Ao renovar seguranças, ele salva na pasta e clonamos pro MongoDB cimentar
+        sock.ev.on('creds.update', async () => {
+             await saveCreds();
+             await uploadSession();
+        });
+    };
 
-    client.initialize();
+    connectToWhatsApp();
 };
 
 const sendMessage = async (whatsappNumber, messageText) => {
-    if (!isReady) {
-        console.warn('⚠️ WhatsApp ainda não está pronto para enviar mensagens. Ignorando envio para:', whatsappNumber);
+    if (!isReady || !clientSocket) {
+        console.warn('⚠️ WhatsApp não está pronto.');
         return false;
     }
     
-    // Tratamento robusto do número: remove tudo que não for dígito
     let cleanNumber = whatsappNumber.replace(/\D/g, '');
-    
-    // Se o usuário digitou apenas DDD + número (ex: 11999999999) com 10 ou 11 dígitos, forçamos o "55" inicial do Brasil
     if (cleanNumber.length <= 11) {
         cleanNumber = `55${cleanNumber}`;
     }
 
-    const chatId = `${cleanNumber}@c.us`;
     try {
-        // Obter número serializado real caso o whatsapp tenha o numero com/sem o nono dígito (No LID fix)
-        const numberId = await client.getNumberId(cleanNumber);
-        if (!numberId) {
+        const jid = `${cleanNumber}@s.whatsapp.net`;
+        
+        const [result] = await clientSocket.onWhatsApp(jid);
+        if (!result || !result.exists) {
             console.error(`❌ Número não possui WhatsApp ativo: ${cleanNumber}`);
             return false;
         }
 
-        await client.sendMessage(numberId._serialized, messageText);
+        await clientSocket.sendMessage(result.jid, { text: messageText });
         console.log(`📩 Mensagem enviada com sucesso para ${cleanNumber}`);
         return true;
     } catch (err) {
