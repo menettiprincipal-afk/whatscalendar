@@ -24,9 +24,9 @@ const initWhatsApp = async () => {
 
     client = new Client({
         authStrategy: new RemoteAuth({
-            clientId: 'bot-calendario',
+            clientId: 'chatbot-final-1', // Mudamos o nome para forçar o Mongo a não tentar baixar um zip imenso do passado, o que tava causando o estouro de memória!
             store: store,
-            backupSyncIntervalMs: 300000 // A cada 5min salva no MongoDB para não perder a sessão no cloud.
+            backupSyncIntervalMs: 300000 
         }),
         puppeteer: {
             args: [
@@ -37,7 +37,9 @@ const initWhatsApp = async () => {
                 '--no-first-run',
                 '--no-zygote',
                 '--disable-gpu',
-                '--js-flags="--max-old-space-size=150"' // Limite da própria inteligência do Chrome pra caber com folga nos 512 do Render
+                '--disable-web-security',
+                '--disable-features=IsolateOrigins,site-per-process',
+                '--js-flags="--max-old-space-size=80"' // Mínimo do V8 para tentar sobreviver ao lado do NodeJS
             ]
         },
         webVersionCache: {
