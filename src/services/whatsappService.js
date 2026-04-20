@@ -1,93 +1,71 @@
-const { default: makeWASocket, DisconnectReason, BufferJSON, initAuthCreds } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, DisconnectReason, useMultiFileAuthState, fetchLatestBaileysVersion, Browsers } = require('@whiskeysockets/baileys');
 const mongoose = require('mongoose');
 const pino = require('pino');
 const qrcode = require('qrcode-terminal');
+const fs = require('fs');
+const path = require('path');
 
 const AuthDocSchema = new mongoose.Schema({
     id: { type: String, unique: true },
-    data: { type: String }
+    files: { type: Map, of: String }
 });
 const BaileysAuth = mongoose.models.BaileysAuth || mongoose.model('BaileysAuth', AuthDocSchema);
 
 let clientSocket = null;
 let isReady = false;
 
-// 🧠 NOSSA MÁGICA: Adaptador de Sessão Baileys Direto pro Mongo (Fim do Zip Gigante de 150mb)
-async function useMongoAuthState(sessionId) {
-    const writeData = async (data, id) => {
-        const str = JSON.stringify(data, BufferJSON.replacer);
-        await BaileysAuth.updateOne({ id: `${sessionId}-${id}` }, { $set: { data: str } }, { upsert: true });
-    };
+// 🧠 NOSSA MÁGICA FINAL: Clonamos o diretório nativo para a nuvem
+const sessionDir = path.join(process.cwd(), 'baileys_auth');
 
-    const readData = async (id) => {
-        const doc = await BaileysAuth.findOne({ id: `${sessionId}-${id}` });
-        if (!doc) return null;
-        return JSON.parse(doc.data, BufferJSON.reviver);
-    };
-
-    const removeData = async (id) => {
-        await BaileysAuth.deleteOne({ id: `${sessionId}-${id}` });
-    };
-
-    let creds = await readData('creds');
-    if (!creds) {
-        creds = initAuthCreds();
-        await writeData(creds, 'creds');
-    }
-
-    return {
-        state: {
-            creds,
-            keys: {
-                get: async (type, ids) => {
-                    const data = {};
-                    await Promise.all(
-                        ids.map(async id => {
-                            let value = await readData(`${type}-${id}`);
-                            if (type === 'app-state-sync-key' && value) {
-                                value = require('@whiskeysockets/baileys').proto.Message.AppStateSyncKeyData.fromObject(value);
-                            }
-                            data[id] = value;
-                        })
-                    );
-                    return data;
-                },
-                set: async (data) => {
-                    const tasks = [];
-                    for (const category in data) {
-                        for (const id in data[category]) {
-                            const value = data[category][id];
-                            const key = `${category}-${id}`;
-                            if (value) {
-                                tasks.push(writeData(value, key));
-                            } else {
-                                tasks.push(removeData(key));
-                            }
-                        }
-                    }
-                    await Promise.all(tasks);
-                }
+async function downloadSession() {
+    try {
+        const doc = await BaileysAuth.findOne({ id: 'meu-bot-v2' });
+        if (doc && doc.files && doc.files.size > 0) {
+            if (!fs.existsSync(sessionDir)) fs.mkdirSync(sessionDir, { recursive: true });
+            for (let [filename, content] of doc.files.entries()) {
+                fs.writeFileSync(path.join(sessionDir, filename), content, 'base64');
             }
-        },
-        saveCreds: () => writeData(creds, 'creds')
+        }
+    } catch (e) {
+        console.error('Falha ao baixar sessão:', e);
     }
 }
 
+async function uploadSession() {
+    try {
+        if (!fs.existsSync(sessionDir)) return;
+        const files = fs.readdirSync(sessionDir);
+        const filesMap = {};
+        for (let file of files) {
+            filesMap[file] = fs.readFileSync(path.join(sessionDir, file)).toString('base64');
+        }
+        await BaileysAuth.updateOne({ id: 'meu-bot-v2' }, { $set: { files: filesMap } }, { upsert: true });
+    } catch (e) {}
+}
+
 const initWhatsApp = async () => {
-    console.log('🟡 Preparando instância do Baileys MODO ULTRA LIGHT SOCADO (Adeus Chrome!)...');
+    console.log('🟡 Preparando instância do Baileys...');
     
-    // Conectamos a autorização customizada usando a base de dados ativa
-    const { state, saveCreds } = await useMongoAuthState('robot-bot-v1');
+    // Baixamos arquivos antigos da nuvem (se tiver)
+    await downloadSession();
+
+    // Passamos pro Baileys oficial ler como ele entende melhor (Nativamente)
+    const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
+    
+    // 🔥 BUSCA A ÚLTIMA VERSÃO OFICIAL DO WHATSAPP ANTES DE CONECTAR
+    const { version, isLatest } = await fetchLatestBaileysVersion();
+    console.log(`📡 Disfarçando servidor com WA Web Oficial v${version.join('.')} (isLatest: ${isLatest})`);
 
     const connectToWhatsApp = () => {
         const sock = makeWASocket({
+            version, // O WhatsApp vai aceitar a conexão imediatamente por não ser versão defasada
             auth: state,
             printQRInTerminal: false,
-            logger: pino({ level: 'silent' }), // Deixa calado, senão ele vomita logs demais da conexão wifi rs
-            browser: ['Bot Calendario', 'Safari', '1.0.0']
+            logger: pino({ level: 'silent' }), // Deixado silencioso
+            browser: Browsers.macOS('Desktop') // Usa o agente de navegador OFICIAL DO PRÓPRIO BAILEYS!
         });
 
-        sock.ev.on('connection.update', (update) => {
+        sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
             
             if (qr) {
@@ -100,26 +78,31 @@ const initWhatsApp = async () => {
             }
 
             if (connection === 'close') {
-                const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-                console.log('🔴 Conexão falhou/fechou. Motivo técnico:', (lastDisconnect.error)?.message);
+                const isLogout = (lastDisconnect.error)?.output?.statusCode === DisconnectReason.loggedOut;
+                
                 isReady = false;
                 
-                if (shouldReconnect) {
-                    console.log('🔄 Tentando reconectar ao WhatsApp silenciosamente...');
+                if (!isLogout) {
+                    console.log('🔄 Tentando reconectar silenciosamente. Motivo profundo:', lastDisconnect.error?.message, lastDisconnect.error);
                     setTimeout(connectToWhatsApp, 5000);
                 } else {
-                    console.log('❌ O BOT FOI DESCONECTADO PELO CELULAR (LogOut)! Ele vai apagar a gaveta do mongo para o próximo QR...');
-                    mongoose.models.BaileysAuth.deleteMany({ id: { $regex: '^robot-bot-v1' } }).exec();
+                    console.log('❌ O BOT FOI DESCONECTADO PELO CELULAR (LogOut)! Ele vai apagar a gaveta da nuvem...');
+                    await BaileysAuth.deleteOne({ id: 'meu-bot-v2' });
+                    try { fs.rmSync(sessionDir, { recursive: true, force: true }); } catch(e){}
                 }
             } else if (connection === 'open') {
                 console.log('🟢 WhatsApp LEVE E SUPREMO ESTÁ PRONTO E CONECTADO!');
                 isReady = true;
                 clientSocket = sock;
+                await uploadSession();
             }
         });
 
-        // Quando o whatsapp atualiza as chaves secretas de 10 em 10 min, forçamos o salvar pro Mongo:
-        sock.ev.on('creds.update', saveCreds);
+        // Ao renovar seguranças, ele salva na pasta e clonamos pro MongoDB cimentar
+        sock.ev.on('creds.update', async () => {
+             await saveCreds();
+             await uploadSession();
+        });
     };
 
     connectToWhatsApp();
@@ -131,7 +114,6 @@ const sendMessage = async (whatsappNumber, messageText) => {
         return false;
     }
     
-    // Higieniza
     let cleanNumber = whatsappNumber.replace(/\D/g, '');
     if (cleanNumber.length <= 11) {
         cleanNumber = `55${cleanNumber}`;
@@ -140,14 +122,12 @@ const sendMessage = async (whatsappNumber, messageText) => {
     try {
         const jid = `${cleanNumber}@s.whatsapp.net`;
         
-        // Verifica pra ver se a pessoa tem zap válido (Substitui o noLid getNumberId)
         const [result] = await clientSocket.onWhatsApp(jid);
         if (!result || !result.exists) {
             console.error(`❌ Número não possui WhatsApp ativo: ${cleanNumber}`);
             return false;
         }
 
-        // Manda de verdade, formato Baileys
         await clientSocket.sendMessage(result.jid, { text: messageText });
         console.log(`📩 Mensagem enviada com sucesso para ${cleanNumber}`);
         return true;
