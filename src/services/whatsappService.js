@@ -124,17 +124,26 @@ const initWhatsApp = async () => {
             }
 
             if (connection === 'close') {
-                const isLogout = (lastDisconnect.error)?.output?.statusCode === DisconnectReason.loggedOut;
+                const statusCode = lastDisconnect.error?.output?.statusCode;
+                const isLogout = statusCode === DisconnectReason.loggedOut;
+                
+                // 440 é connectionReplaced, 409 é Conflict. Ambos significam: "Outra máquina roubou a sessão".
+                const isReplaced = statusCode === DisconnectReason.connectionReplaced || 
+                                   statusCode === 409 || 
+                                   lastDisconnect.error?.message?.includes('conflict');
                 
                 isReady = false;
                 
-                if (!isLogout) {
-                    console.log('🔄 Tentando reconectar silenciosamente. Motivo profundo:', lastDisconnect.error?.message);
-                    setTimeout(connectToWhatsApp, 5000);
-                } else {
+                if (isLogout) {
                     console.log('❌ O BOT FOI DESCONECTADO PELO CELULAR (LogOut)!');
                     // Apagando apenas a pasta antiga que sobrou para fins de limpeza
                     await AuthStateModel.deleteMany({ _id: { $regex: '^meu-bot-v2-' } });
+                } else if (isReplaced) {
+                    console.log('⚠️ Conexão substituída por outra máquina (Novo Deploy subiu?). Abortando re-conexão para evitar cabo de guerra!');
+                    // Deixamos a instância velha desativada no WhatsApp. O Render a matará em breve.
+                } else {
+                    console.log(`🔄 Tentando reconectar silenciosamente. Motivo: ${lastDisconnect.error?.message} | Code: ${statusCode}`);
+                    setTimeout(connectToWhatsApp, 5000);
                 }
             } else if (connection === 'open') {
                 console.log('🟢 WhatsApp LEVE E SUPREMO ESTÁ PRONTO E CONECTADO!');
