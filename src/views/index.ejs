@@ -13,7 +13,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            min-height: 100vh;
             margin: 0;
         }
         .container {
@@ -55,18 +55,26 @@
             transition: background-color 0.2s;
         }
         button:hover { background-color: #1DA851; }
+        footer {
+            margin-top: 40px;
+            font-size: 14px;
+            text-align: center;
+            width: 100%;
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Seu Google Calendar no WhatsApp</h1>
-        <p>Preencha seu número e autorize o calendário. Receba as notificações diárias de seus compromissos no seu celular toda manhã de forma orgânica e silenciosa.</p>
-        <form action="/connect" method="POST">
-            <input type="text" name="whatsappNumber" placeholder="Número (DDI, DDD e Telefone)" required>
-            <button type="submit">Conectar via Google</button>
-        </form>
-        <footer style="margin-top: 30px; font-size: 11px;">
-            <a href="https://whatscalendar-1.onrender.com/privacidade" style="color: #0000EE; text-decoration: underline;">Política de Privacidade / Privacy Policy</a>
+    <div style="display: flex; flex-direction: column; align-items: center; padding: 20px; width: 100%;">
+        <div class="container">
+            <h1>Seu Google Calendar no WhatsApp</h1>
+            <p>Preencha seu número e autorize o calendário. Receba as notificações diárias de seus compromissos no seu celular toda manhã de forma orgânica e silenciosa.</p>
+            <form action="/connect" method="POST">
+                <input type="text" name="whatsappNumber" placeholder="Número (DDI, DDD e Telefone)" required>
+                <button type="submit">Conectar via Google</button>
+            </form>
+        </div>
+        <footer>
+            <a href="https://whatscalendar-1.onrender.com/privacidade" style="color: #0000EE; text-decoration: underline; font-weight: 500;">Política de Privacidade / Privacy Policy</a>
         </footer>
     </div>
 </body>
