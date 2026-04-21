@@ -7,6 +7,7 @@ const bodyParser = require('body-parser');
 
 const { initWhatsApp } = require('./src/services/whatsappService');
 const { initCron } = require('./src/services/cronService');
+const { startKeepAlive } = require('./src/services/keepAliveService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -41,6 +42,8 @@ mongoose.connect(process.env.MONGODB_URI)
     
     app.listen(PORT, () => {
         console.log(`🚀 Servidor Web rodando na porta ${PORT}`);
+        // Inicia o sistema de Keep Alive para evitar o Sleep Mode do Render
+        startKeepAlive();
     });
   })
   .catch(err => console.error('🔴 Erro ao conectar no banco MongoDB:', err));

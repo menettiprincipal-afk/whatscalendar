@@ -11,6 +11,11 @@ router.get('/privacidade', (req, res) => {
     res.render('privacy');
 });
 
+// Rota de Keep Alive / Health Check
+router.get('/ping', (req, res) => {
+    res.status(200).send('pong');
+});
+
 // A rota captura o formulário, pega o telefone e redireciona (enviando o state na transação OAuth)
 router.post('/connect', (req, res) => {
     const { whatsappNumber, preferredTime } = req.body;

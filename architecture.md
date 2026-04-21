@@ -17,3 +17,4 @@
 - `calendarService.js`: Motor do Google Auth2 e extrator da agenda (`calendar.events.list(...)`).
 - `whatsappService.js`: Motor WebSocket usando Baileys + Mongoose Adapter para enviar os eventos em forma de texto no formato `- [HH:MM]: <Titulo>`.
 - `cronService.js`: Agendador e loop por usuário rodando internamente assíncrono para enviar as rotinas.
+- `keepAliveService.js`: Sistema de auto-ping que previne o "Sleep Mode" do Render Free Tier, garantindo operação 24/7.

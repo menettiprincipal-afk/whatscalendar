@@ -59,6 +59,11 @@ const initCron = async () => {
         const now = new Date();
         const currentTime = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
         
+        // Log discreto para indicar que o motor está vivo
+        if (now.getSeconds() === 0) {
+            console.log(`[HEARTBEAT] Cron ativo: ${currentTime}`);
+        }
+
         console.log(`[CRON] Verificando usuários agendados para as ${currentTime}...`);
         try {
             const users = await User.find({ "googleTokens.access_token": { $exists: true }, preferredTime: currentTime });
