@@ -10,7 +10,7 @@ const runRoutineForUsers = async (users) => {
     for (const user of users) {
         try {
             // Instancia apenas os eventos de AMANHÃ
-            const events = await getTomorrowsEvents(user.googleTokens);
+            const events = await getTomorrowsEvents(user);
             
             // SE NÃO TEM EVENTOS PARA O DIA SEGUINTE, O BOT MANTÉM SILÊNCIO.
             if (events.length === 0) {

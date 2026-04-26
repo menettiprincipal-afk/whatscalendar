@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Escolha suas Agendas - WhatsCalendar</title>
+    <style>
+        :root {
+            --primary: #00E676;
+            --primary-dark: #00C853;
+            --accent: #2979FF;
+            --bg: #F4F7FE;
+            --text-dark: #2B3674;
+            --text-gray: #A3AED0;
+            --card-bg: #FFFFFF;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            background-image: linear-gradient(135deg, #F4F7FE 0%, #E2EDF8 100%);
+            color: var(--text-dark);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .container {
+            background: var(--card-bg);
+            padding: 40px 30px;
+            border-radius: 20px;
+            box-shadow: 0 18px 40px rgba(112, 144, 176, 0.12);
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 5px;
+            background: linear-gradient(90deg, var(--accent), var(--primary));
+        }
+
+        h1 { 
+            font-weight: 700; 
+            font-size: 22px; 
+            margin-bottom: 12px; 
+            color: var(--text-dark);
+        }
+
+        p { 
+            color: var(--text-gray); 
+            font-size: 14px; 
+            margin-bottom: 25px; 
+            line-height: 1.6; 
+        }
+
+        .calendar-list {
+            text-align: left;
+            margin-bottom: 30px;
+            max-height: 300px;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+
+        .calendar-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            background: #F4F7FE;
+            border-radius: 12px;
+            margin-bottom: 10px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+
+        .calendar-item:hover {
+            background: #E2EDF8;
+        }
+
+        .calendar-item input[type="checkbox"] {
+            margin-right: 15px;
+            width: 20px;
+            height: 20px;
+            accent-color: var(--primary);
+            cursor: pointer;
+        }
+
+        .calendar-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .calendar-name {
+            font-weight: 600;
+            font-size: 15px;
+            color: var(--text-dark);
+        }
+
+        .calendar-email {
+            font-size: 12px;
+            color: var(--text-gray);
+        }
+
+        button {
+            width: 100%;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            padding: 16px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 16px rgba(0, 200, 83, 0.2);
+        }
+
+        button:hover { 
+            transform: translateY(-2px);
+            box-shadow: 0 12px 20px rgba(0, 200, 83, 0.3);
+        }
+
+        /* Custom Scrollbar */
+        .calendar-list::-webkit-scrollbar {
+            width: 6px;
+        }
+        .calendar-list::-webkit-scrollbar-track {
+            background: #F4F7FE;
+        }
+        .calendar-list::-webkit-scrollbar-thumb {
+            background: var(--text-gray);
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Quais agendas deseja monitorar?</h1>
+        <p>Selecione as agendas que você quer que o WhatsCalendar envie para você todos os dias.</p>
+        
+        <form action="/save-calendars" method="POST">
+            <input type="hidden" name="whatsappNumber" value="<%= whatsappNumber %>">
+            <input type="hidden" name="preferredTime" value="<%= preferredTime %>">
+            
+            <div class="calendar-list">
+                <% calendars.forEach(cal => { %>
+                    <label class="calendar-item">
+                        <input type="checkbox" name="selectedCalendars" value="<%= cal.id %>" <%= cal.primary ? 'checked' : '' %>>
+                        <div class="calendar-info">
+                            <span class="calendar-name"><%= cal.summary %></span>
+                            <span class="calendar-email"><%= cal.id %></span>
+                        </div>
+                    </label>
+                <% }) %>
+            </div>
+            
+            <button type="submit">Finalizar Configuração</button>
+        </form>
+    </div>
+</body>
+</html>

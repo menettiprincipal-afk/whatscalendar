@@ -40,19 +40,27 @@
                     <th>Número WhatsApp</th>
                     <th>E-mail Connectado</th>
                     <th>Horário</th>
+                    <th>Agendas</th>
                     <th>Token Local</th>
                     <th>Ações</th>
                 </tr>
             </thead>
             <tbody>
                 <% if (users.length === 0) { %>
-                    <tr><td colspan="5" style="text-align:center; padding: 30px; color: #666;">Ainda não há clientes cadastrados na plataforma.</td></tr>
+                    <tr><td colspan="6" style="text-align:center; padding: 30px; color: #666;">Ainda não há clientes cadastrados na plataforma.</td></tr>
                 <% } %>
                 <% users.forEach(user => { %>
                     <tr>
                         <td><strong><%= user.whatsappNumber %></strong></td>
                         <td><%= user.calendarEmail || 'Aguardando Sinc Google...' %></td>
                         <td><%= user.preferredTime || '17:00' %></td>
+                        <td>
+                            <% if (user.selectedCalendars && user.selectedCalendars.length > 0) { %>
+                                <span class="badge-active"><%= user.selectedCalendars.length %> selecionada(s)</span>
+                            <% } else { %>
+                                <span class="badge-pending">Padrão (1)</span>
+                            <% } %>
+                        </td>
                         <td>
                             <% if (user.googleTokens && user.googleTokens.access_token) { %>
                                 <span class="badge-active">Autorizado</span>

@@ -54,9 +54,17 @@ const handleCallback = async (code, whatsappNumber, preferredTime) => {
   return user;
 };
 
-const getTomorrowsEvents = async (userTokens) => {
+const listUserCalendars = async (userTokens) => {
   const client = getOAuthClient();
   client.setCredentials(userTokens);
+  const calendar = google.calendar({ version: 'v3', auth: client });
+  const res = await calendar.calendarList.list();
+  return res.data.items || [];
+};
+
+const getTomorrowsEvents = async (user) => {
+  const client = getOAuthClient();
+  client.setCredentials(user.googleTokens);
   const calendar = google.calendar({ version: 'v3', auth: client });
 
   const tomorrow = new Date();
@@ -68,15 +76,35 @@ const getTomorrowsEvents = async (userTokens) => {
   const endOfDay = new Date(tomorrow);
   endOfDay.setHours(23, 59, 59, 999);
 
-  const res = await calendar.events.list({
-    calendarId: 'primary',
-    timeMin: startOfDay.toISOString(),
-    timeMax: endOfDay.toISOString(),
-    singleEvents: true,
-    orderBy: 'startTime',
+  const selectedCalendars = user.selectedCalendars && user.selectedCalendars.length > 0 
+    ? user.selectedCalendars 
+    : ['primary'];
+
+  let allEvents = [];
+  
+  for (const calendarId of selectedCalendars) {
+    try {
+      const res = await calendar.events.list({
+        calendarId: calendarId,
+        timeMin: startOfDay.toISOString(),
+        timeMax: endOfDay.toISOString(),
+        singleEvents: true,
+        orderBy: 'startTime',
+      });
+      allEvents = allEvents.concat(res.data.items || []);
+    } catch (err) {
+      console.error(`Erro ao buscar eventos do calendário ${calendarId}:`, err.message);
+    }
+  }
+
+  // Ordena por horário de início, já que eventos de calendários diferentes virão fora de ordem
+  allEvents.sort((a, b) => {
+    const startA = a.start.dateTime || a.start.date;
+    const startB = b.start.dateTime || b.start.date;
+    return new Date(startA) - new Date(startB);
   });
 
-  return res.data.items || [];
+  return allEvents;
 };
 
-module.exports = { getAuthUrl, handleCallback, getTomorrowsEvents, getOAuthClient };
+module.exports = { getAuthUrl, handleCallback, listUserCalendars, getTomorrowsEvents, getOAuthClient };

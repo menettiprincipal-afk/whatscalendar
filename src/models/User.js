@@ -21,6 +21,10 @@ const UserSchema = new mongoose.Schema({
     type: String,
     default: '17:00'
   },
+  selectedCalendars: {
+    type: [String],
+    default: ['primary']
+  },
   createdAt: {
     type: Date,
     default: Date.now

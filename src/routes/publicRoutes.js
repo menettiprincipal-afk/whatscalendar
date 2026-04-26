@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { getAuthUrl, handleCallback } = require('../services/calendarService');
+const { getAuthUrl, handleCallback, listUserCalendars } = require('../services/calendarService');
+const User = require('../models/User');
 
 router.get('/', (req, res) => {
     res.render('index');
@@ -36,17 +37,31 @@ router.get('/api/calendar/callback', async (req, res) => {
     const [whatsappNumber, preferredTime] = rawState.split('|'); 
 
     try {
-        await handleCallback(code, whatsappNumber, preferredTime);
-        res.send(`
-            <div style="font-family: sans-serif; text-align: center; max-width: 400px; margin: 50px auto; padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
-                <h2 style="color: #25D366;">Conectado com Sucesso!</h2>
-                <p>O número <b>${whatsappNumber}</b> foi vinculado ao seu Google Calendar.</p>
-                <p>Você começará a receber a sua agenda de compromissos todos os dias às <b>${preferredTime || '17:00'}</b> diretamente no seu WhatsApp.</p>
-            </div>
-        `);
+        const user = await handleCallback(code, whatsappNumber, preferredTime);
+        const calendars = await listUserCalendars(user.googleTokens);
+        
+        res.render('select-calendars', {
+            whatsappNumber,
+            preferredTime,
+            calendars
+        });
     } catch (err) {
         console.error('Google Callback Error:', err);
         res.send('<h2>Erro de Autenticação</h2><p>Tivemos um problema ao conectar-se aos serviços do Google. Tente novamente.</p>');
+    }
+});
+
+router.post('/save-calendars', async (req, res) => {
+    const { whatsappNumber, selectedCalendars, preferredTime } = req.body;
+    
+    try {
+        const calendars = Array.isArray(selectedCalendars) ? selectedCalendars : (selectedCalendars ? [selectedCalendars] : ['primary']);
+        await User.findOneAndUpdate({ whatsappNumber }, { selectedCalendars: calendars });
+        
+        res.render('success', { whatsappNumber, preferredTime });
+    } catch (err) {
+        console.error('Save Calendars Error:', err);
+        res.send('<h2>Erro ao salvar agendas</h2><p>Tente novamente.</p>');
     }
 });
 
